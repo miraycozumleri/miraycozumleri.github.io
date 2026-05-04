@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Çözüm Görüntüleyici</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .app { width: 100%; height: 100%; position: relative; overflow: hidden; }
+        .swipe-container { width: 100%; height: 100%; overflow: hidden; touch-action: pan-y pinch-zoom; }
+        .image-wrapper { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
+        .image-wrapper img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; user-select: none; pointer-events: none; }
+
+        .info-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0));
+            color: white;
+            padding: 20px 16px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 100;
+            pointer-events: none;
+        }
+        .test-name {
+            font-size: 13px;
+            font-weight: 500;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 10px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            pointer-events: auto;
+        }
+        .counter {
+            background: rgba(0,0,0,0.5);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            pointer-events: auto;
+        }
+        .nav-buttons {
+            position: fixed;
+            top: 50%;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+            display: flex;
+            justify-content: space-between;
+            padding: 0 12px;
+            pointer-events: none;
+            z-index: 99;
+        }
+        .nav-btn {
+            pointer-events: auto;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(8px);
+            color: white;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.2s ease;
+        }
+        .nav-btn:active { transform: scale(0.95); background: rgba(0,0,0,0.6); }
+
+        .test-panel {
+            position: fixed;
+            top: 0;
+            right: -280px;
+            width: 280px;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(20px);
+            z-index: 200;
+            transition: right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid rgba(255,255,255,0.1);
+        }
+        .test-panel.open { right: 0; }
+        .test-panel-header {
+            padding: 20px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .test-panel-header h3 { color: white; font-size: 16px; font-weight: 600; }
+        .close-panel {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .close-panel:active { background: rgba(255,255,255,0.1); }
+        .test-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+        .section-header {
+            padding: 12px 16px;
+            color: #0084ff;
+            font-size: 14px;
+            font-weight: 700;
+            background: rgba(0,132,255,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            margin-top: 8px;
+        }
+        .section-header:first-child { margin-top: 0; }
+        .test-item {
+            padding: 12px 16px 12px 28px;
+            color: rgba(255,255,255,0.7);
+            font-size: 13px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .test-item:active { background: rgba(255,255,255,0.05); }
+        .test-item.active {
+            background: rgba(0, 132, 255, 0.2);
+            color: white;
+            border-left: 3px solid #0084ff;
+        }
+        .menu-btn {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 101;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .menu-btn:active { transform: scale(0.95); background: rgba(0,0,0,0.7); }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 150;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        .overlay.active { opacity: 1; visibility: visible; }
+        .help-tip {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            padding: 8px 16px;
+            border-radius: 30px;
+            color: white;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 102;
+            pointer-events: none;
+            animation: fadeOut 3s ease forwards;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            z-index: 300;
+            display: none;
+        }
+        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+        @media (max-width: 480px) { .nav-btn { width: 38px; height: 38px; font-size: 18px; } .test-panel { width: 260px; } }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="swipe-container" id="swipeContainer">
+            <div class="image-wrapper">
+                <img id="current-image" alt="Çözüm Görseli">
+            </div>
+        </div>
+        <div class="nav-buttons">
+            <button class="nav-btn" id="prev-btn">←</button>
+            <button class="nav-btn" id="next-btn">→</button>
+        </div>
+        <div class="info-bar">
+            <span class="test-name" id="test-name">Yükleniyor...</span>
+            <span class="counter" id="counter">0 / 0</span>
+        </div>
+        <button class="menu-btn" id="menuBtn">☰</button>
+        <div class="overlay" id="overlay"></div>
+        <div class="test-panel" id="testPanel">
+            <div class="test-panel-header">
+                <h3>Bölümler ve Testler</h3>
+                <button class="close-panel" id="closePanel">✕</button>
+            </div>
+            <div class="test-list" id="testList"></div>
+        </div>
+        <div class="loading" id="loading"></div>
+    </div>
+
+    <script>
+        // ==================== BÖLÜM VE TEST VERİLERİ ====================
+        const sections = [
+            {
+                name: "1. Bölüm",
+                tests: [
+                    { folder: "1.BolümTest1", name: "Test-1", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest2", name: "Test-2", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest3", name: "Test-3", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest4", name: "Test-4", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest5", name: "Test-5", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest6", name: "Test-6", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest7", name: "Test-7", questionCount: 9, checked: false },
+                    { folder: "1.BolümTest8", name: "Test-8", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest9", name: "Test-9", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest10", name: "Test-10", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest11", name: "Test-11", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest12", name: "Test-12", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest13", name: "Test-13", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest14", name: "Test-14", questionCount: 5, checked: false },
+                    { folder: "1.BolümDeneme1", name: "Deneme-1", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest15", name: "Test-15", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest16", name: "Test-16", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest17", name: "Test-17", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest18", name: "Test-18", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest19", name: "Test-19", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest20", name: "Test-20", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest21", name: "Test-21", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest22", name: "Test-22", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest23", name: "Test-23", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest24", name: "Test-24", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest25", name: "Test-25", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest26", name: "Test-26", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest27", name: "Test-27", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest28", name: "Test-28", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest29", name: "Test-29", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest30", name: "Test-30", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest31", name: "Test-31", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest32", name: "Test-32", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest33", name: "Test-33", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest34", name: "Test-34", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest35", name: "Test-35", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest36", name: "Test-36", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest37", name: "Test-37", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest38", name: "Test-38", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest39", name: "Test-39", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest40", name: "Test-40", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest41", name: "Test-41", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest42", name: "Test-42", questionCount: 6, checked: false },
+                    { folder: "1.BolümTest43", name: "Test-43", questionCount: 6, checked: false },
+                    { folder: "1.BolümDeneme2", name: "Deneme-2", questionCount: 10, checked: false },
+                    { folder: "1.BolümDeneme3", name: "Deneme-3", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest44", name: "Test-44", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest45", name: "Test-45", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest46", name: "Test-46", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest47", name: "Test-47", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest48", name: "Test-48", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest49", name: "Test-49", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest50", name: "Test-50", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest51", name: "Test-51", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest52", name: "Test-52", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest53", name: "Test-53", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest54", name: "Test-54", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest55", name: "Test-55", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest56", name: "Test-56", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest57", name: "Test-57", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest58", name: "Test-58", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest59", name: "Test-59", questionCount: 6, checked: false },
+                    { folder: "1.BolümDeneme4", name: "Deneme-4", questionCount: 10, checked: false },
+                    { folder: "1.BolümTest60", name: "Test-60", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest61", name: "Test-61", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest62", name: "Test-62", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest63", name: "Test-63", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest64", name: "Test-64", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest65", name: "Test-65", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest66", name: "Test-66", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest67", name: "Test-67", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest68", name: "Test-68", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest69", name: "Test-69", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest70", name: "Test-70", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest71", name: "Test-71", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest72", name: "Test-72", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest73", name: "Test-73", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest74", name: "Test-74", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest75", name: "Test-75", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest76", name: "Test-76", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest77", name: "Test-77", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest78", name: "Test-78", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest79", name: "Test-79", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest80", name: "Test-80", questionCount: 8, checked: false },
+                    { folder: "1.BolümTest81", name: "Test-81", questionCount: 8, checked: true },
+                    { folder: "1.BolümTest82", name: "Test-82", questionCount: 8, checked: true },
+                    { folder: "1.BolümTest83", name: "Test-83", questionCount: 8, checked: true },
+                    { folder: "1.BolümTest84", name: "Test-84", questionCount: 4, checked: false },
+                    { folder: "1.BolümDeneme5", name: "Deneme-5", questionCount: 8, checked: false }
+                ]
+            },
+            {
+                name: "2. Bölüm",
+                tests: [
+                    { folder: "2.BolümTest1", name: "Test-1", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest2", name: "Test-2", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest3", name: "Test-3", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest4", name: "Test-4", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest5", name: "Test-5", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest6", name: "Test-6", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest7", name: "Test-7", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest8", name: "Test-8", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest9", name: "Test-9", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest10", name: "Test-10", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest11", name: "Test-11", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest12", name: "Test-12", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest13", name: "Test-13", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest14", name: "Test-14", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest15", name: "Test-15", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest16", name: "Test-16", questionCount: 7, checked: false },
+                    { folder: "2.BolümTest17", name: "Test-17", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest18", name: "Test-18", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest19", name: "Test-19", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest20", name: "Test-20", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest21", name: "Test-21", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest22", name: "Test-22", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest23", name: "Test-23", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest24", name: "Test-24", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest25", name: "Test-25", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest26", name: "Test-26", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest27", name: "Test-27", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest28", name: "Test-28", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest29", name: "Test-29", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest30", name: "Test-30", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest31", name: "Test-31", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest32", name: "Test-32", questionCount: 7, checked: false },
+                    { folder: "2.BolümTest33", name: "Test-33", questionCount: 6, checked: false },
+                    { folder: "2.BolümTest34", name: "Test-34", questionCount: 6, checked: false },
+                    { folder: "2.BolümTest35", name: "Test-35", questionCount: 6, checked: false },
+                    { folder: "2.BolümTest36", name: "Test-36", questionCount: 6, checked: false },
+                    { folder: "2.BolümDeneme6", name: "Deneme-6", questionCount: 8, checked: false },
+                    { folder: "2.BolümDeneme7", name: "Deneme-7", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest37", name: "Test-37", questionCount: 10, checked: false },
+                    { folder: "2.BolümTest38", name: "Test-38", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest39", name: "Test-39", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest40", name: "Test-40", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest41", name: "Test-41", questionCount: 8, checked: false },
+                    { folder: "2.BolümTest42", name: "Test-42", questionCount: 4, checked: false },
+                    { folder: "2.BolümDeneme8", name: "Deneme-8", questionCount: 8, checked: false },
+                    { folder: "2.BolümDeneme9", name: "Deneme-9", questionCount: 8, checked: false },
+                    { folder: "2.BolümDeneme10", name: "Deneme-10", questionCount: 8, checked: false },
+                    { folder: "2.BolümDeneme11", name: "Deneme-11", questionCount: 8, checked: false },
+                    { folder: "2.BolümDeneme12", name: "Deneme-12", questionCount: 8, checked: false }
+                ]
+            }
+        ];
+
+        let allTests = [];
+        sections.forEach(section => {
+            section.tests.forEach(test => {
+                allTests.push({
+                    sectionName: section.name,
+                    folder: test.folder,
+                    testName: test.name,
+                    questionCount: test.questionCount,
+                    checked: test.checked
+                });
+            });
+        });
+
+        let currentTestIndex = 0;
+        let currentQuestionIndex = 0;
+        let totalQuestions = 0;
+
+        const imgElement = document.getElementById('current-image');
+        const testNameSpan = document.getElementById('test-name');
+        const counterSpan = document.getElementById('counter');
+        const testListDiv = document.getElementById('testList');
+        const loadingDiv = document.getElementById('loading');
+
+        function showLoading() { loadingDiv.style.display = 'block'; }
+        function hideLoading() { loadingDiv.style.display = 'none'; }
+
+        function saveCheckedStatus() {
+            localStorage.setItem('testCheckedStatus', JSON.stringify(allTests.map(t => t.checked)));
+        }
+
+        function loadCheckedStatus() {
+            const saved = localStorage.getItem('testCheckedStatus');
+            if (saved) {
+                const checkedArray = JSON.parse(saved);
+                for (let i = 0; i < allTests.length && i < checkedArray.length; i++) {
+                    allTests[i].checked = checkedArray[i];
+                }
+            }
+        }
+
+        function loadTest(index) {
+            if (index >= allTests.length) return;
+            const test = allTests[index];
+            totalQuestions = test.questionCount;
+            testNameSpan.innerText = `${test.sectionName} - ${test.testName}`;
+            currentQuestionIndex = 0;
+            showImage();
+            updateActiveTestInList();
+            // Listeyi yeniden oluştur (tik işaretleri için)
+            buildTestList();
+        }
+
+        function showImage() {
+            if (totalQuestions === 0) return;
+            const test = allTests[currentTestIndex];
+            const questionNum = (currentQuestionIndex + 1).toString().padStart(2, '0');
+            const imagePath = `cozumler/${test.folder}/${questionNum}.png`;
+            
+            showLoading();
+            imgElement.onload = () => { hideLoading(); };
+            imgElement.onerror = () => {
+                hideLoading();
+                imgElement.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23333"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%23ff6666" font-size="14"%3E⚠️ Resim bulunamadı%3C/text%3E%3C/svg%3E';
+            };
+            imgElement.src = imagePath;
+            counterSpan.innerText = `${currentQuestionIndex + 1} / ${totalQuestions}`;
+        }
+
+        function nextImage() {
+            if (totalQuestions === 0) return;
+            if (currentQuestionIndex + 1 < totalQuestions) {
+                currentQuestionIndex++;
+                showImage();
+            } else {
+                // SON SORUDA SAĞA BASINCA OTOMATİK SONRAKİ TESTE GEÇ
+                allTests[currentTestIndex].checked = true;
+                saveCheckedStatus();
+                if (currentTestIndex + 1 < allTests.length) {
+                    currentTestIndex++;
+                    currentQuestionIndex = 0;
+                    loadTest(currentTestIndex);
+                    closePanel();
+                } else {
+                    if (confirm("Tüm testleri tamamladınız! Başa dönmek ister misiniz?")) {
+                        currentTestIndex = 0;
+                        currentQuestionIndex = 0;
+                        loadTest(currentTestIndex);
+                    }
+                }
+            }
+        }
+
+        function prevImage() {
+            if (totalQuestions === 0) return;
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                showImage();
+            } else if (currentTestIndex > 0) {
+                currentTestIndex--;
+                currentQuestionIndex = allTests[currentTestIndex].questionCount - 1;
+                loadTest(currentTestIndex);
+                closePanel();
+            }
+        }
+
+        function goToTest(index) {
+            currentTestIndex = index;
+            currentQuestionIndex = 0;
+            loadTest(currentTestIndex);
+            closePanel();
+        }
+
+        function updateActiveTestInList() {
+            let globalIndex = 0;
+            sections.forEach(section => {
+                section.tests.forEach((test, idx) => {
+                    const element = document.getElementById(`test_${section.name}_${idx}`);
+                    if (element) {
+                        if (globalIndex === currentTestIndex) {
+                            element.classList.add('active');
+                        } else {
+                            element.classList.remove('active');
+                        }
+                    }
+                    globalIndex++;
+                });
+            });
+        }
+
+        function openPanel() {
+            document.getElementById('testPanel').classList.add('open');
+            document.getElementById('overlay').classList.add('active');
+            buildTestList();
+        }
+        
+        function closePanel() {
+            document.getElementById('testPanel').classList.remove('open');
+            document.getElementById('overlay').classList.remove('active');
+        }
+
+        function buildTestList() {
+            testListDiv.innerHTML = '';
+            let globalIndex = 0;
+            
+            sections.forEach(section => {
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'section-header';
+                sectionDiv.innerText = section.name;
+                testListDiv.appendChild(sectionDiv);
+                
+                section.tests.forEach((test, idx) => {
+                    const testItem = document.createElement('div');
+                    testItem.id = `test_${section.name}_${idx}`;
+                    testItem.className = 'test-item';
+                    if (globalIndex === currentTestIndex) testItem.classList.add('active');
+                    
+                    const checkMark = test.checked ? ' ✓' : '';
+                    testItem.innerHTML = `<span>${test.name}${checkMark}</span><span class="test-badge">${test.questionCount} soru</span>`;
+                    
+                    testItem.addEventListener('click', (function(index) {
+                        return function() { goToTest(index); };
+                    })(globalIndex));
+                    
+                    testListDiv.appendChild(testItem);
+                    globalIndex++;
+                });
+            });
+        }
+
+        // Touch swipe
+        let touchStartX = 0;
+        function handleTouchStart(e) { touchStartX = e.changedTouches[0].screenX; }
+        function handleTouchEnd(e) {
+            const diff = e.changedTouches[0].screenX - touchStartX;
+            if (Math.abs(diff) > 50) { 
+                diff > 0 ? prevImage() : nextImage(); 
+            }
+        }
+
+        // Keyboard
+        function handleKeyboard(e) {
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') nextImage();
+            else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') prevImage();
+        }
+
+        // Event listeners
+        document.getElementById('swipeContainer').addEventListener('touchstart', handleTouchStart);
+        document.getElementById('swipeContainer').addEventListener('touchend', handleTouchEnd);
+        document.getElementById('prev-btn').addEventListener('click', prevImage);
+        document.getElementById('next-btn').addEventListener('click', nextImage);
+        document.getElementById('menuBtn').addEventListener('click', openPanel);
+        document.getElementById('closePanel').addEventListener('click', closePanel);
+        document.getElementById('overlay').addEventListener('click', closePanel);
+        document.addEventListener('keydown', handleKeyboard);
+        window.addEventListener('resize', () => setTimeout(() => showImage(), 100));
+
+        // Başlat
+        loadCheckedStatus();
+        
+        let lastTestIndex = 0;
+        for (let i = 0; i < allTests.length; i++) {
+            if (!allTests[i].checked) { lastTestIndex = i; break; }
+        }
+        currentTestIndex = lastTestIndex;
+        loadTest(currentTestIndex);
+        buildTestList();
+
+        setTimeout(() => {
+            const tip = document.createElement('div');
+            tip.className = 'help-tip';
+            tip.innerHTML = '← → kaydırarak soruları değiştirin | ☰ menüden test seçin';
+            document.body.appendChild(tip);
+            setTimeout(() => tip.remove(), 4000);
+        }, 500);
+    </script>
+</body>
+</html>
